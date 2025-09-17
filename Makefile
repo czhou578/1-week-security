@@ -42,15 +42,15 @@ fuzzytest: install_dev  ## Run fuzzy tests
 
 .PHONY: install_base
 install_base:  ## Install base requirements and dependencies
-	uv pip install -r requirements/base.txt
+	uv pip install -r requirements/base.in
 
 .PHONY: install_common
 install_common: requirements install_base  ## Install common requirements and dependencies
-	uv pip sync requirements/common.txt
+	uv pip sync requirements/common.in
 
 .PHONY: install_dev
 install_dev: requirements install_base  ## Install dev requirements and dependencies
-	uv pip sync requirements/dev.txt
+	uv pip sync requirements/dev.in
 
 .PHONY: outdated
 outdated:  ## Check outdated requirements and dependencies

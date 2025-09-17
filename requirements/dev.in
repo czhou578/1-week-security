@@ -7,3 +7,11 @@ pytest~=8.4.0
 requests-mock~=1.12.0
 ruff~=0.12.0
 schemathesis~=4.1.0
+starlette
+pydantic
+pydantic_core
+typing_extensions
+fastapi
+dotenv
+typing_inspection
+sqlachemy

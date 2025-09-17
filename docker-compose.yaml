@@ -1,3 +1,5 @@
+version: '3.3'
+
 services:
   app:
     environment:
@@ -5,26 +7,54 @@ services:
       - PUBLIC_IP_SERVICE_URL
       - SUPER_SECRET_NAME
       - SUPER_SECRET_TOKEN
-    image: ${APP_IMAGE:-python-insecure-app:latest}
+      - DATABASE_URL=postgresql://admin:password123@db:5432/insecure_app
+    image: python-insecure-app:latest
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    container_name: postgres_db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=insecure_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    restart: always
+
+  frontend:
+    build: 
+      context: ./frontend/insecure-frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - app
+    restart: always    
 
   proxy:
     build: ./caddy
     container_name: caddy
     depends_on:
-      app:
-        condition: service_started
+      - app
     environment:
       - LETSENCRYPT_EMAIL
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
       interval: 15s
       timeout: 5s
-      start_period: 5s
       retries: 5
     ports:
       - "80:80"
       - "443:443"
-      - "1337:1337" # app
+      - "1337:1337"
     restart: always
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
@@ -33,3 +63,4 @@ services:
 
 volumes:
   caddy_data:
+  postgres_data:
