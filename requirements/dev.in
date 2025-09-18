@@ -14,4 +14,5 @@ typing_extensions
 fastapi
 dotenv
 typing_inspection
-sqlachemy
+sqlalchemy
+pyjwt

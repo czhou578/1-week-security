@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Cookies from 'js-cookie';
 
 const ProductSearch = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -12,7 +13,9 @@ const ProductSearch = () => {
         e.preventDefault();
 
         try {
-            const token = localStorage.getItem('authToken'); // VULNERABILITY: Using non-HttpOnly token
+
+            const token = Cookies.get('authToken') || localStorage.getItem('authToken');
+
 
             const response = await fetch(`/api/products/search?q=${searchTerm}`, {
                 headers: {

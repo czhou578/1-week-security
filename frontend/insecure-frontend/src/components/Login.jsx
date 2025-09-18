@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Cookies from 'js-cookie'
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -25,8 +26,22 @@ const Login = () => {
 
             if (data.token) {
                 // VULNERABILITY: Storing sensitive token in localStorage (not HttpOnly)
+
+                Cookies.set('authToken', data.token, {
+                    expires: 7,
+                    secure: true,
+                    sameSite: 'strict'
+                })
+
+                Cookies.set('userInfo', JSON.stringify(data.user), {
+                    expires: 7,
+                    secure: true,
+                    sameSite: 'strict'
+                })
+
                 localStorage.setItem('authToken', data.token);
                 localStorage.setItem('userInfo', JSON.stringify(data.user));
+
                 setMessage('Login successful!');
             } else {
                 setMessage(data.error || 'Login failed');

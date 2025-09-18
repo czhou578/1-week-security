@@ -172,3 +172,5 @@ requirements/*.txt
 .trivy/
 .zap/
 *.bak
+
+app/keys
