@@ -9,7 +9,7 @@ const ProductSearch = () => {
     // VULNERABILITY: Another hardcoded API key
     const SEARCH_API_KEY = 'prod-search-key-9876543210';
 
-    const handleSearch = async (e) => {
+    const handleSearch = async (e: any) => {
         e.preventDefault();
 
         try {
@@ -29,7 +29,7 @@ const ProductSearch = () => {
             setSearchResults(`Found ${data.products?.length || 0} products for "${searchTerm}"`);
 
         } catch (error) {
-            setSearchResults('Search failed: ' + error.message);
+            setSearchResults('Search failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
         }
     };
 
@@ -60,7 +60,7 @@ const ProductSearch = () => {
             )}
 
             <div style={{ display: 'grid', gap: '10px' }}>
-                {products.map((product, index) => (
+                {products.map((product: any, index) => (
                     <div key={index} style={{ border: '1px solid #ccc', padding: '10px' }}>
                         {/* VULNERABILITY: XSS - dangerouslySetInnerHTML with product data */}
                         <h3 dangerouslySetInnerHTML={{ __html: product.name }} />

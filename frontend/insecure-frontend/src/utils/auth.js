@@ -14,7 +14,7 @@ export const getUserInfo = () => {
 
 export const setAuthData = (token, userInfo) => {
     // VULNERABILITY: Store in multiple places (redundant insecurity)
-    Cookies.set('authToken', token, { expires: 30, secure: false });
+    Cookies.set('authToken', token, { expires: 30, secure: false, sameSite: true });
     Cookies.set('userInfo', JSON.stringify(userInfo), { expires: 30, secure: false });
     localStorage.setItem('authToken', token);
     localStorage.setItem('userInfo', JSON.stringify(userInfo));

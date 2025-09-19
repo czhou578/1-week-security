@@ -2,15 +2,27 @@ version: '3.3'
 
 services:
   app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: insecure_app
     environment:
-      - DEBUG
+      - DEBUG=True
       - PUBLIC_IP_SERVICE_URL
       - SUPER_SECRET_NAME
       - SUPER_SECRET_TOKEN
       - DATABASE_URL=postgresql://admin:password123@db:5432/insecure_app
-    image: python-insecure-app:latest
+    ports:
+      - "8000:1337"
     depends_on:
       - db
+    networks:
+      - backend-network
+      - frontend-network
+    volumes:
+      - ./app:/app
+    # Override the command to ensure uvicorn runs properly
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "1337", "--reload"]
 
   db:
     image: postgres:16
@@ -25,6 +37,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     restart: always
+    networks:
+      - backend-network
 
   frontend:
     build: 
@@ -35,9 +49,16 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - app
-    restart: always    
+    restart: always
+    networks:
+      - frontend-network
+    volumes:
+      - ./frontend/insecure-frontend/src:/app/src
+      - ./frontend/insecure-frontend/public:/app/public
+      - /app/node_modules
 
   proxy:
     build: ./caddy
@@ -60,6 +81,22 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
     command: ["caddy", "run", "--watch", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    networks:
+      - frontend-network
+      - proxy-network
+
+networks:
+  backend-network:
+    driver: bridge
+    internal: true
+  
+  frontend-network:
+    driver: bridge
+    internal: false
+
+  proxy-network:
+    driver: bridge
+    internal: false   
 
 volumes:
   caddy_data:

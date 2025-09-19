@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const FileUpload = () => {
-    const [file, setFile] = useState(null);
+    const [file, setFile] = useState<File | null>(null);
     const [uploadStatus, setUploadStatus] = useState('');
     const [preview, setPreview] = useState('');
 
@@ -9,21 +9,23 @@ const FileUpload = () => {
     const FILE_UPLOAD_KEY = 'upload-secret-abc123def456';
     const AWS_ACCESS_KEY = 'AKIA1234567890EXAMPLE'; // VULNERABILITY: Hardcoded AWS key
 
-    const handleFileChange = (e) => {
-        const selectedFile = e.target.files[0];
-        setFile(selectedFile);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0];
+        setFile(selectedFile || null);
 
         if (selectedFile) {
             // VULNERABILITY: No file type validation
             const reader = new FileReader();
             reader.onload = (event) => {
-                setPreview(event.target.result);
+                if (event.target && typeof event.target.result === 'string') {
+                    setPreview(event.target.result);
+                }
             };
             reader.readAsDataURL(selectedFile);
         }
     };
 
-    const handleUpload = async (e) => {
+    const handleUpload = async (e: React.ChangeEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!file) {
@@ -51,7 +53,7 @@ const FileUpload = () => {
             setUploadStatus(result.message || 'Upload successful!');
 
         } catch (error) {
-            setUploadStatus('Upload failed: ' + error.message);
+            setUploadStatus('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
         }
     };
 

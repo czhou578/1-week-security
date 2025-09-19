@@ -1,8 +1,8 @@
 -- Create users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
@@ -23,22 +23,15 @@ CREATE TABLE products (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert some sample data (insecure - MD5 hashed passwords, weak hashing)
+-- Insert sample users (using MD5 hashes - VULNERABILITY: weak hashing)
 INSERT INTO users (username, email, password, first_name, last_name, role) VALUES
-('admin', 'admin@example.com', '0192023a7bbd73250516f069df18b500', 'Admin', 'User', 'admin'),  -- admin123
-('john_doe', 'john@example.com', '482c811da5d5b4bc6d497ffa98491e38', 'John', 'Doe', 'user'),      -- password123
-('jane_smith', 'jane@example.com', 'd8578edf8458ce06fbc5bb76a58c5ca4', 'Jane', 'Smith', 'user'),   -- qwerty
-('test_user', 'test@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'User', 'user'),    -- test
-('power_user', 'power@example.com', '5f4dcc3b5aa765d61d8327deb882cf99', 'Power', 'User', 'admin'); -- password
-
--- Insert more test users with different roles
-INSERT INTO users (username, email, password, first_name, last_name, role) VALUES
-('admin', 'admin@example.com', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'Admin', 'User', 'admin'),
-('john_doe', 'john@example.com', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'John', 'Doe', 'user'),
-('jane_smith', 'jane@example.com', 'd8578edf8458ce06fbc5bb76a58c5ca4', 'Jane', 'Smith', 'user'),
-('moderator1', 'mod@example.com', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'Mod', 'Erator', 'moderator'),
-('test_admin', 'testadmin@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'Admin', 'admin');
--- Passwords: admin123, password, qwerty, password, test
+('admin', 'admin@example.com', '0192023a7bbd73250516f069df18b500', 'Admin', 'User', 'admin'),        -- admin123
+('john_doe', 'john@example.com', '482c811da5d5b4bc6d497ffa98491e38', 'John', 'Doe', 'user'),         -- password123
+('jane_smith', 'jane@example.com', 'd8578edf8458ce06fbc5bb76a58c5ca4', 'Jane', 'Smith', 'user'),      -- qwerty
+('test_user', 'test@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'User', 'user'),       -- test
+('power_user', 'power@example.com', '5f4dcc3b5aa765d61d8327deb882cf99', 'Power', 'User', 'admin'),   -- password
+('moderator1', 'mod@example.com', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'Mod', 'Erator', 'moderator'), -- password
+('test_admin', 'testadmin@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'Admin', 'admin'); -- test
 
 -- Insert sample products
 INSERT INTO products (name, description, price, category, stock_quantity) VALUES

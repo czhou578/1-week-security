@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
-import Cookies from 'js-cookie'
+import React, { useEffect, useState } from 'react';
+import Cookies from 'js-cookie';
 
 const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
+    const [csrfToken, setCsrfToken] = useState('');
+
 
     // VULNERABILITY: Hardcoded API key in frontend code
     const API_KEY = 'sk-1234567890abcdef-SUPER-SECRET-KEY';
 
-    const handleLogin = async (e) => {
+    useEffect(() => {
+        fetchCSRFToken()
+    }, [])
+
+    const fetchCSRFToken = async () => {
+        try {
+            const response = await fetch(`/api/csrf-token`, {
+                credentials: 'include'
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setCsrfToken(data.csrf_token)
+            }
+        } catch (error) {
+            console.error('Failed to fetch CSRF token:', error);
+        }
+    }
+
+    const handleLogin = async (e: any) => {
         e.preventDefault();
 
         try {
@@ -17,7 +38,7 @@ const Login = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': API_KEY // VULNERABILITY: Exposing API key
+                    'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({ username, password })
             });
@@ -47,7 +68,7 @@ const Login = () => {
                 setMessage(data.error || 'Login failed');
             }
         } catch (error) {
-            setMessage('Network error: ' + error.message);
+            setMessage('Network error: ' + (error instanceof Error ? error.message : 'Unknown error'));
         }
     };
 

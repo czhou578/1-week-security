@@ -1,34 +1,44 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import Login from './components/Login'
+import ProductSearch from './components/ProductSearch'
+import FileUpload from './components/FileUpload'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('login')
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="App">
+      <header style={{ padding: '20px', backgroundColor: '#f0f0f0', marginBottom: '20px' }}>
+        <h1>Insecure Frontend App</h1>
+        <nav>
+          <button 
+            onClick={() => setActiveTab('login')}
+            style={{ margin: '0 10px', padding: '5px 10px' }}
+          >
+            Login
+          </button>
+          <button 
+            onClick={() => setActiveTab('search')}
+            style={{ margin: '0 10px', padding: '5px 10px' }}
+          >
+            Product Search
+          </button>
+          <button 
+            onClick={() => setActiveTab('upload')}
+            style={{ margin: '0 10px', padding: '5px 10px' }}
+          >
+            File Upload
+          </button>
+        </nav>
+      </header>
+
+      <main style={{ padding: '0 20px' }}>
+        {activeTab === 'login' && <Login />}
+        {activeTab === 'search' && <ProductSearch />}
+        {activeTab === 'upload' && <FileUpload />}
+      </main>
+    </div>
   )
 }
 

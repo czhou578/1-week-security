@@ -1,7 +1,7 @@
 """The main file for a Python Insecure App."""
 
 import requests
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Cookie, Form, Header
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jinja2 import Template
@@ -14,8 +14,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 from functools import wraps
 from enum import Enum
-
-from app import config
+import secrets
+import config
+import logging
 
 app = FastAPI(
     title="Try Hack Me",
@@ -23,6 +24,11 @@ app = FastAPI(
     version="0.0.1337",
     debug=config.DEBUG,
 )
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()])
+logger = logging.getLogger(__name__)
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@localhost:5432/insecure_app")
@@ -163,6 +169,23 @@ def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+def generate_csrf_token():
+    """
+    Generate csrf token
+    """
+
+    timestamp = str(int(datetime.now().timestamp()))
+    secret = "csrf"
+    token = hashlib.md5(f"{timestamp}{secret}".encode()).hexdigest()
+
+    return token
+
+def verify_csrf_token(token: str):
+    if not token: return False
+
+    if len(token) == 32: return True
+
+    return False
 
 @app.get("/", response_class=HTMLResponse)
 async def try_hack_me(name: str = config.SUPER_SECRET_NAME):
@@ -188,6 +211,17 @@ async def try_hack_me(name: str = config.SUPER_SECRET_NAME):
     # FIXME: https://fastapi.tiangolo.com/advanced/custom-response/#return-a-response
     return Template(content).render()
 
+@app.get("/csrf-token")
+async def get_csrf_token():
+    """Get CSRF Token"""
+
+    token = generate_csrf_token()
+
+    return {
+        "csrf_token": token,
+        "expires": "never",  # VULNERABILITY: Tokens don't expire
+        "algorithm": "md5"   # VULNERABILITY: Exposing algorithm
+    }
 
 @app.post("/register")
 async def register(user: UserCreate):
@@ -225,14 +259,23 @@ async def register(user: UserCreate):
         return {"error": str(e)}
 
 @app.post("/login")
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, x_csrf_token: str = Header(None, alias="X-CSRF-Token")):
     """Login endpoint - VULNERABILITY: No rate limiting, plaintext password comparison"""
+
+    if not x_csrf_token:
+        raise HTTPException(
+            status_code=403,
+            detail="No CSRF Token was provided."
+        )
+
     try:
         with engine.connect() as connection:
             # VULNERABILITY: SQL injection
             query = f"SELECT id, username, email, first_name, last_name, password, role FROM users WHERE username = '{login_data.username}'"
             result = connection.execute(text(query))
+            # print('result is,')
             row = result.fetchone()
+            logging.info(f'query result is {row}')
             
             if row:
                 stored_password = row[5]
@@ -267,7 +310,7 @@ async def login(login_data: LoginRequest):
         return {"error": str(e)}
 
 @app.get("/users")
-async def get_users(username: str = None, current_user: dict = Depends(require_roles["admin"])):
+async def get_users(username: str = None, current_user: dict = Depends(require_roles(["admin"]))):
     """Get users - VULNERABILITY: SQL injection, no proper access control"""
     try:
         with engine.connect() as connection:
