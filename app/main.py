@@ -17,6 +17,7 @@ from enum import Enum
 import secrets
 import config
 import logging
+from crypto_utils import hash_password, verify_password, encrypt_data, decrypt_data, needs_rehash
 
 app = FastAPI(
     title="Try Hack Me",
@@ -230,6 +231,14 @@ async def register(user: UserCreate):
         with engine.connect() as connection:
             # VULNERABILITY: No password strength requirements
             hashed_password = hash_password(user.password)
+
+            encrypted_email = encrypt_data(user.email)
+
+            if not encrypted_email:
+                logger.warning("Failed to encrypt email")
+                encrypted_email = user.email
+            else:
+                logger.info(f"email encrypted for user")
             
             # VULNERABILITY: SQL injection via direct string concatenation
             query = f"""
@@ -244,12 +253,16 @@ async def register(user: UserCreate):
             row = result.fetchone()
             
             if row:
+                stored_email = row[2]
+                decrypted_email = decrypt_data(stored_email)
+                display_email = decrypted_email if decrypted_email else stored_email
+
                 return {
                     "message": "User registered successfully",
                     "user": {
                         "id": row[0],
                         "username": row[1],
-                        "email": row[2],
+                        "email": display_email,
                         "first_name": row[3],
                         "last_name": row[4],
                         "role": row[5]
@@ -283,10 +296,15 @@ async def login(login_data: LoginRequest, x_csrf_token: str = Header(None, alias
                 
                 # VULNERABILITY: Timing attack possible
                 if stored_password == input_password_hash:
+
+                    encrypted_email = row[2]
+                    decrypted_email = decrypt_data(encrypted_email)
+                    display_email = decrypted_email if decrypted_email else encrypted_email
+
                     user_data = {
                         "id": row[0],
                         "username": row[1],
-                        "email": row[2],
+                        "email": display_email,
                         "first_name": row[3],
                         "last_name": row[4],
                         "role": row[6] if row[6] else "user"
