@@ -97,3 +97,7 @@ Removes all unused networks in docker
 ```
 docker-compose down --remove-orphans
 ```
+
+Managed to review SQL Views and how to create extension and custom utility functions in sql
+
+database encryption - can be queried normally. Even if someone gets db access or uses sql injection, db will still be encrypted!

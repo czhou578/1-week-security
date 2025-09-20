@@ -243,9 +243,9 @@ async def register(user: UserCreate):
             # VULNERABILITY: SQL injection via direct string concatenation
             query = f"""
                 INSERT INTO users (username, email, password, first_name, last_name, role) 
-                VALUES ('{user.username}', '{user.email}', '{hashed_password}', 
+                VALUES ('{user.username}', encrypt_email('{user.email}'), '{hashed_password}', 
                         '{user.first_name}', '{user.last_name}', '{user.role}')
-                RETURNING id, username, email, first_name, last_name, role
+                RETURNING id, username, decrypt_email(email) as email, first_name, last_name, role
             """
             
             result = connection.execute(text(query))
@@ -262,7 +262,7 @@ async def register(user: UserCreate):
                     "user": {
                         "id": row[0],
                         "username": row[1],
-                        "email": display_email,
+                        "email": row[2],
                         "first_name": row[3],
                         "last_name": row[4],
                         "role": row[5]
@@ -297,14 +297,13 @@ async def login(login_data: LoginRequest, x_csrf_token: str = Header(None, alias
                 # VULNERABILITY: Timing attack possible
                 if stored_password == input_password_hash:
 
-                    encrypted_email = row[2]
-                    decrypted_email = decrypt_data(encrypted_email)
-                    display_email = decrypted_email if decrypted_email else encrypted_email
+                    # encrypted_email = row[2]
+                    # decrypted_email = decrypt_data(encrypted_email)
 
                     user_data = {
                         "id": row[0],
                         "username": row[1],
-                        "email": display_email,
+                        "email": row[2],
                         "first_name": row[3],
                         "last_name": row[4],
                         "role": row[6] if row[6] else "user"

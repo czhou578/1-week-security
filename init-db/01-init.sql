@@ -1,8 +1,11 @@
+-- Enable pgcrypto extension
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Create users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
+    email TEXT NOT NULL, -- TEXT to store encrypted data
     password VARCHAR(255) NOT NULL,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
@@ -23,15 +26,30 @@ CREATE TABLE products (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert sample users (using MD5 hashes - VULNERABILITY: weak hashing)
+-- Create utility functions for encrypted email operations
+CREATE OR REPLACE FUNCTION encrypt_email(email_text TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN pgp_sym_encrypt(email_text, 'email_encryption_key_2024');
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION decrypt_email(encrypted_email TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN pgp_sym_decrypt(encrypted_email, 'email_encryption_key_2024');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN encrypted_email; -- Return original if decryption fails
+END;
+$$ LANGUAGE plpgsql;
+
+-- Insert sample users with encrypted emails
 INSERT INTO users (username, email, password, first_name, last_name, role) VALUES
-('admin', 'admin@example.com', '0192023a7bbd73250516f069df18b500', 'Admin', 'User', 'admin'),        -- admin123
-('john_doe', 'john@example.com', '482c811da5d5b4bc6d497ffa98491e38', 'John', 'Doe', 'user'),         -- password123
-('jane_smith', 'jane@example.com', 'd8578edf8458ce06fbc5bb76a58c5ca4', 'Jane', 'Smith', 'user'),      -- qwerty
-('test_user', 'test@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'User', 'user'),       -- test
-('power_user', 'power@example.com', '5f4dcc3b5aa765d61d8327deb882cf99', 'Power', 'User', 'admin'),   -- password
-('moderator1', 'mod@example.com', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'Mod', 'Erator', 'moderator'), -- password
-('test_admin', 'testadmin@example.com', '098f6bcd4621d373cade4e832627b4f6', 'Test', 'Admin', 'admin'); -- test
+('admin', encrypt_email('admin@example.com'), '0192023a7bbd73250516f069df18b500', 'Admin', 'User', 'admin'),
+('john_doe', encrypt_email('john@example.com'), '482c811da5d5b4bc6d497ffa98491e38', 'John', 'Doe', 'user'),
+('jane_smith', encrypt_email('jane@example.com'), 'd8578edf8458ce06fbc5bb76a58c5ca4', 'Jane', 'Smith', 'user'),
+('test_user', encrypt_email('test@example.com'), '098f6bcd4621d373cade4e832627b4f6', 'Test', 'User', 'user');
 
 -- Insert sample products
 INSERT INTO products (name, description, price, category, stock_quantity) VALUES
