@@ -73,6 +73,30 @@ CSRF - a type of cyber attack that tricks a user into executing unwanted actions
 - use server-side input validation
 - use untrusted data when building sql query
 
+5. Insecure Design
+
+- Establish and use a secure development lifecycle with AppSec professionals
+- Use threat modeling for critical authentication
+- One of the factors that contribute to insecure design is the lack of business risk profiling inherent in the software or system being developed, and thus the failure to determine what level of security design is required.
+
+6. Security Misconfig
+
+- Error handling reveals stack traces
+- The server does not send security headers or directives, or they are not set to secure values.
+- out of date
+- Unnecessary features are enabled or installed (e.g., unnecessary ports, services, pages, accounts, or privileges).
+
+7. 
+- If you do not know the versions of all components you use (both client-side and server-side). This includes components you directly use as well as nested dependencies.
+- you do not scan for vulnerabilities regularly
+- Remove unused dependencies, unnecessary features, components, files, and documentation.
+
+8. Software and Data Integrity Failures
+- insecure CI/CD pipeline
+- auto update functionality without sufficient integrity verification
+- objects or data are encoded into structure that an attacker can see.
+- use digital signatures or similar mechanisms to verify software. 
+
 ## Local storage vs cookie storage
 
 Cookie storage have better security configs and better access control!
@@ -135,3 +159,16 @@ Cannot connect to Docker:
 localhost refers to the container itself when inside Docker
 db is the Docker Compose service name that resolves to the database container
 Docker creates an internal network where services can reach each other by service name
+
+SRI Protection
+- allows browsers to verify that resources fetched haven't been tampered with
+- generates cryptographic hash, adds hash to the html
+- browser downloads resource, calculates the hash and compares it to expected hash
+- if hash doesn't match, indicates tampering.
+
+ Security Risks Without SRI:
+CDN Compromise: If your CDN is hacked, malicious scripts could be injected
+Man-in-the-Middle Attacks: Attackers could replace scripts during transit
+Third-party Dependencies: External scripts could be modified without your knowledge
+Supply Chain Attacks: Compromised packages could inject malicious code
+

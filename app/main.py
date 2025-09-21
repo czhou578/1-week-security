@@ -4,6 +4,7 @@ import requests
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Template
 from sqlalchemy import create_engine, text
 import os
@@ -24,6 +25,53 @@ app = FastAPI(
     version="0.0.1337",
     debug=config.DEBUG,
 )
+
+def get_cors_origins():
+    """Get CORS origins based on environment"""
+    if config.DEBUG:
+        # Development - more permissive
+        return [
+            "http://localhost:3000",
+            "http://localhost:8000", 
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "http://localhost:1337"
+        ]
+    else:
+        # Production - strict origins only
+        allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        # Remove empty strings
+        return [origin.strip() for origin in allowed_origins if origin.strip()]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origina=get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-CSRF-Token",
+        "X-Requested-With"
+    ],
+    expose_headers=["X-Total-Count"],
+    max_age=600
+)
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    return response
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

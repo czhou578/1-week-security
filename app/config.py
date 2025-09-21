@@ -6,7 +6,13 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
-DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes", "y")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+
+
+DEBUG = ENVIRONMENT == "development"
+
+if "DEBUG" in os.environ:
+    DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes", "y")
 
 PUBLIC_IP_SERVICE_URL = os.getenv("PUBLIC_IP_SERVICE_URL")
 
@@ -14,3 +20,5 @@ SUPER_SECRET_NAME = "John Ripper"
 
 SUPER_SECRET_TOKEN = "5u93R53Cr3tT0k3n"
 DB_ENCRYPTION_KEY = os.getenv("DB_ENCRYPTION_KEY", "email_encryption_key_2024")
+
+print(f"🔧 Running in {ENVIRONMENT} mode (Debug: {DEBUG})")
