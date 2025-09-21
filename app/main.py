@@ -1,7 +1,7 @@
 """The main file for a Python Insecure App."""
 
 import requests
-from fastapi import FastAPI, HTTPException, Depends, status, Cookie, Form, Header
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jinja2 import Template
@@ -9,15 +9,14 @@ from sqlalchemy import create_engine, text
 import os
 import jwt
 import hashlib
-from datetime import datetime, timedelta
-from pydantic import BaseModel
-from typing import Optional, List
+from datetime import datetime
+from typing import List
 from functools import wraps
-from enum import Enum
-import secrets
 import config
 import logging
-from crypto_utils import hash_password, verify_password, encrypt_data, decrypt_data, needs_rehash
+from crypto_utils import hash_password, encrypt_data, decrypt_data
+from pathlib import Path
+from models import UserCreate, UserRole, LoginRequest
 
 app = FastAPI(
     title="Try Hack Me",
@@ -31,8 +30,59 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("app.log"), logging.StreamHandler()])
 logger = logging.getLogger(__name__)
 
+def read_secret(secret_name: str, fallback: str = None) -> str:
+    """Read secret from file or return fallback"""
+    try:
+        # Try Docker secrets first (/run/secrets/)
+        docker_secret_path = Path(f"/run/secrets/{secret_name}")
+        if docker_secret_path.exists():
+            return docker_secret_path.read_text().strip()
+        
+        # Try local secrets folder (remove .txt extension assumption)
+        local_secret_path = Path(f"secrets/{secret_name}.txt")
+        if local_secret_path.exists():
+            return local_secret_path.read_text().strip()
+            
+    except Exception as e:
+        logger.warning(f"Failed to read secret '{secret_name}': {e}")
+    
+    # Return fallback or raise error
+    if fallback is not None:
+        return fallback
+    raise ValueError(f"Secret '{secret_name}' not found and no fallback provided")
+
+def build_database_url() -> str:
+    """Build database URL from secrets"""
+    try:
+        # Read database credentials from secrets
+        db_user = read_secret("db_user", "admin")
+        db_password = read_secret("db_password", "password123")  
+        db_host = read_secret("db_host", "db")        # Default to 'db' service name
+        db_port = read_secret("db_port", "5432")
+        db_name = read_secret("db_name", "insecure_app")
+        
+        # Build URL
+        database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        
+        # Log connection (without password)
+        logger.info(f"Database: postgresql://{db_user}:***@{db_host}:{db_port}/{db_name}")
+        
+        return database_url
+        
+    except Exception as e:
+        logger.error(f"Failed to build database URL from secrets: {e}")
+        # Fallback with Docker service name (NOT localhost)
+        return "postgresql://admin:password123@db:5432/insecure_app"
+
 # Database setup
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@localhost:5432/insecure_app")
+try:
+    DATABASE_URL = build_database_url()
+    logger.info("Using database credentials from secrets")
+except Exception as e:
+    logger.error(f"Failed to load database secrets: {e}")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@localhost:5432/insecure_app")
+    logger.warning("Using fallback database URL")
+    
 engine = create_engine(DATABASE_URL)
 
 # VULNERABILITY: Weak JWT secret
@@ -55,34 +105,6 @@ JWT_ALGORITHM = "RS256" if PRIVATE_KEY else "HS256"
 
 # Security setup
 security = HTTPBearer(auto_error=False)
-
-# Pydantic models
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[str] = "user"  # Default role
-
-    def validate_role(cls, v):
-        if v not in ["user", "moderator", "admin"]:
-            raise ValueError("Invalid role")
-        return v    
-
-class UserUpdate(BaseModel):
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[str] = None
-
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
 
 def hash_password(password: str) -> str:
     """VULNERABILITY: Weak hashing - just MD5, no salt"""
@@ -284,16 +306,30 @@ async def login(login_data: LoginRequest, x_csrf_token: str = Header(None, alias
     try:
         with engine.connect() as connection:
             # VULNERABILITY: SQL injection
-            query = f"SELECT id, username, email, first_name, last_name, password, role FROM users WHERE username = '{login_data.username}'"
-            result = connection.execute(text(query))
-            # print('result is,')
+            # query = f"SELECT id, username, email, first_name, last_name, password, role FROM users WHERE username = '{login_data.username}'"
+            
+            query = text("""
+                SELECT id, username, email, first_name, last_name, password, role 
+                FROM users 
+                WHERE username = :username
+            """)            
+            
+            result = connection.execute(query, {"username": login_data.username})
             row = result.fetchone()
             logging.info(f'query result is {row}')
             
             if row:
                 stored_password = row[5]
-                input_password_hash = hash_password(login_data.password)
+                if stored_password is None:
+                    logging.error("Stored password is none")
+                    return {"Error": "invalid credentials"}
                 
+                try:
+                    input_password_hash = hash_password(login_data.password)
+                except Exception as e:
+                    logging.error(f"Password hashing error: {e}")
+                    return {"error": "Authentication failed"}
+
                 # VULNERABILITY: Timing attack possible
                 if stored_password == input_password_hash:
 
@@ -333,12 +369,15 @@ async def get_users(username: str = None, current_user: dict = Depends(require_r
         with engine.connect() as connection:
             if username:
                 # VULNERABLE: Direct string concatenation - SQL injection risk
-                query = f"SELECT id, username, email, first_name, last_name, role FROM users WHERE username = '{username}'"
+                # query = f"SELECT id, username, email, first_name, last_name, role FROM users WHERE username = '{username}'"
+                query = text("""
+                            SELECT id, username, email, first_name, last_name, role FROM users WHERE username = :username
+                             """)
             else:
-                query = "SELECT id, username, email, first_name, last_name, role FROM users"
+                query = text("""SELECT id, username, email, first_name, last_name, role FROM users""")
 
             # Execute raw SQL without parameterization
-            result = connection.execute(text(query))
+            result = connection.execute(query, {"username": username})
             users = []
             for row in result:
                 users.append(
@@ -364,8 +403,11 @@ async def get_user_by_id(user_id: str, current_user: dict = Depends(require_admi
     try:
         with engine.connect() as connection:
             # VULNERABLE: Direct string concatenation + IDOR
-            query = f"SELECT id, username, email, first_name, last_name, password, role FROM users WHERE id = {user_id}"
-            result = connection.execute(text(query))
+            # query = f"SELECT id, username, email, first_name, last_name, password, role FROM users WHERE id = {user_id}"
+            query = text(""" 
+                        SELECT id, username, email, first_name, last_name, password, role FROM users WHERE id = :user_id
+                        """)
+            result = connection.execute(query)
             row = result.fetchone()
 
             if row:
@@ -386,58 +428,14 @@ async def get_user_by_id(user_id: str, current_user: dict = Depends(require_admi
     except Exception as e:
         return {"error": str(e)}
 
-@app.put("/user/{user_id}")
-async def update_user(user_id: str, user_update: UserUpdate, current_user: dict = Depends(require_admin_self)):
-    """VULNERABILITY: IDOR - can update any user by ID, no authorization check"""
-    try:
-        with engine.connect() as connection:
-            # Build update query dynamically (more SQL injection opportunities)
-            updates = []
-            if user_update.email:
-                updates.append(f"email = '{user_update.email}'")
-            if user_update.first_name:
-                updates.append(f"first_name = '{user_update.first_name}'")
-            if user_update.last_name:
-                updates.append(f"last_name = '{user_update.last_name}'")
-            if user_update.role:
-                # VULNERABILITY: Any authenticated user can change roles!
-                updates.append(f"role = '{user_update.role}'")
-            
-            if not updates:
-                return {"error": "No fields to update"}
-            
-            # VULNERABLE: SQL injection + IDOR
-            query = f"UPDATE users SET {', '.join(updates)} WHERE id = {user_id} RETURNING id, username, email, first_name, last_name, role"
-            result = connection.execute(text(query))
-            connection.commit()
-            row = result.fetchone()
-            
-            if row:
-                return {
-                    "message": f"User {user_id} updated by {current_user['username']}",
-                    "user": {
-                        "id": row[0],
-                        "username": row[1],
-                        "email": row[2],
-                        "first_name": row[3],
-                        "last_name": row[4],
-                        "role": row[5]
-                    }
-                }
-            else:
-                return {"error": "User not found"}
-                
-    except Exception as e:
-        return {"error": str(e)}
-
 @app.delete("/user/{user_id}")
 async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """VULNERABILITY: IDOR - can delete any user, minimal access control"""
     try:
         with engine.connect() as connection:
             # VULNERABILITY: No check if user should be able to delete this account
-            query = f"DELETE FROM users WHERE id = {user_id} RETURNING username"
-            result = connection.execute(text(query))
+            query = text("""DELETE FROM users WHERE id = :id RETURNING username""")
+            result = connection.execute(query, {id: user_id})
             connection.commit()
             row = result.fetchone()
             
@@ -482,12 +480,17 @@ async def admin_get_all_users(admin_user: dict = Depends(require_admin)):
 
 @app.post("/admin/promote/{user_id}")
 async def promote_user_to_admin(user_id: str, admin_user: dict = Depends(require_admin)):
-    """VULNERABILITY: IDOR + SQL injection even in admin endpoint"""
+    """Admin promote user with parameterized query"""
     try:
         with engine.connect() as connection:
-            # VULNERABLE: Direct string concatenation
-            query = f"UPDATE users SET role = 'admin' WHERE id = {user_id} RETURNING username, role"
-            result = connection.execute(text(query))
+            # SECURE: Parameterized query prevents SQL injection
+            query = text("""
+                UPDATE users SET role = 'admin' 
+                WHERE id = :user_id 
+                RETURNING username, role
+            """)
+            
+            result = connection.execute(query, {"user_id": user_id})
             connection.commit()
             row = result.fetchone()
             
@@ -499,7 +502,8 @@ async def promote_user_to_admin(user_id: str, admin_user: dict = Depends(require
                 return {"error": "User not found"}
                 
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Promotion error: {e}")
+        return {"error": "Failed to promote user"}
 
 @app.get("/profile")
 async def get_own_profile(current_user: dict = Depends(get_current_user)):
@@ -508,7 +512,10 @@ async def get_own_profile(current_user: dict = Depends(get_current_user)):
         with engine.connect() as connection:
             # Even this has SQL injection
             query = f"SELECT id, username, email, first_name, last_name, role FROM users WHERE id = {current_user['user_id']}"
-            result = connection.execute(text(query))
+            query = text(""" 
+                        SELECT id, username, email, first_name, last_name, role FROM users WHERE id = :id
+                    """)
+            result = connection.execute(query, {id: current_user["user_id"]})
             row = result.fetchone()
             
             if row:

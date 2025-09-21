@@ -8,10 +8,7 @@ services:
     container_name: insecure_app
     environment:
       - DEBUG=True
-      - PUBLIC_IP_SERVICE_URL
-      - SUPER_SECRET_NAME
-      - SUPER_SECRET_TOKEN
-      - DATABASE_URL=postgresql://admin:password123@db:5432/insecure_app
+      - USE_DOCKER_SECRETS=true  # Tell app to use secrets
     ports:
       - "8000:1337"
     depends_on:
@@ -21,16 +18,21 @@ services:
       - frontend-network
     volumes:
       - ./app:/app
-    # Override the command to ensure uvicorn runs properly
+    # Give app access to secrets
+    secrets:
+      - db_user
+      - db_password
+      - db_name
+      - db_host
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "1337", "--reload"]
 
-  db:
+  db:                    # This name must match db_host.txt
     image: postgres:16
     container_name: postgres_db
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=password123
-      - POSTGRES_DB=insecure_app
+      - POSTGRES_USER_FILE=/run/secrets/db_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_DB_FILE=/run/secrets/db_name
     ports:
       - "5432:5432"
     volumes:
@@ -39,6 +41,10 @@ services:
     restart: always
     networks:
       - backend-network
+    secrets:
+      - db_user
+      - db_password
+      - db_name
 
   frontend:
     build: 
@@ -101,3 +107,17 @@ networks:
 volumes:
   caddy_data:
   postgres_data:
+
+secrets:
+  db_user:
+    file: ./secrets/db_user.txt
+  db_password:
+    file: ./secrets/db_password.txt
+  app_db_user:
+    file: ./secrets/app_db_user.txt
+  app_db_password:
+    file: ./secrets/app_db_password.txt
+  db_name:
+    file: ./secrets/db_name.txt
+  db_host:
+    file: ./secrets/db_host.txt

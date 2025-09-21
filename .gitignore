@@ -174,3 +174,4 @@ requirements/*.txt
 *.bak
 
 app/keys
+secrets/

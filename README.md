@@ -68,6 +68,11 @@ openssl genrsa -out private_key.pem 2048
 
 CSRF - a type of cyber attack that tricks a user into executing unwanted actions on a web application where they are authenticated
 
+4. SQL Injection
+
+- use server-side input validation
+- use untrusted data when building sql query
+
 ## Local storage vs cookie storage
 
 Cookie storage have better security configs and better access control!
@@ -101,3 +106,32 @@ docker-compose down --remove-orphans
 Managed to review SQL Views and how to create extension and custom utility functions in sql
 
 database encryption - can be queried normally. Even if someone gets db access or uses sql injection, db will still be encrypted!
+
+```sql
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+```
+
+
+chmod 600
+chmod 700
+
+Permissions Breakdown for chmod
+
+4 = read (r)
+2 = write (w)
+1 = execute (x)
+0 = no permissions
+
+First digit: Owner permissions (user who owns the file/directory).
+Second digit: Group permissions (users in the file’s group).
+Third digit: Others permissions (all other users).
+
+Add the digits
+
+parameterize queries 
+
+Cannot connect to Docker:
+
+localhost refers to the container itself when inside Docker
+db is the Docker Compose service name that resolves to the database container
+Docker creates an internal network where services can reach each other by service name
